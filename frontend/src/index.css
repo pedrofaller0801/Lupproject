@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos para impressão do relatório */
+@media print {
+  .no-print { display: none !important; }
+  .print-full { width: 100% !important; }
+}

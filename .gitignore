@@ -1,0 +1,32 @@
+# Variáveis de ambiente — nunca versionar
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Imagens geradas automaticamente pelo pipeline de ingestão
+documentos/imagens_cache/
+
+# Node / React
+frontend/node_modules/
+frontend/dist/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# PDFs enviados por usuários (dados sensíveis)
+documentos/manual/*.pdf
+documentos/projetos/*.pdf
