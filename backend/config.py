@@ -41,8 +41,8 @@ TAMANHO_CHUNK         = 300    # tokens por chunk
 OVERLAP_CHUNK         = 50     # overlap entre chunks consecutivos
 MIN_CHARS_PAGINA      = 100    # páginas com menos chars são consideradas gráficas
 MAX_PAGINAS_ANALISE   = 10     # limite de pranchas enviadas ao Gemini por análise
-MAX_CHUNKS_MANUAL     = 4      # chunks do manual recuperados por consulta
-MAX_CHUNKS_REFERENCIA = 3      # chunks de referência recuperados por consulta
+MAX_CHUNKS_MANUAL     = 8      # chunks do manual recuperados por consulta
+MAX_CHUNKS_REFERENCIA = 5      # chunks de referência recuperados por consulta
 
 
 # ---------------------------------------------------------------------------
