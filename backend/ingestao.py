@@ -187,6 +187,12 @@ def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int
     print(f"Indexando: {caminho.name}  (tipo: {tipo})")
     print(f"{'─'*60}")
 
+    # Pula se o arquivo já estiver indexado
+    existente = supabase.table("documentos").select("id").eq("nome_arquivo", caminho.name).limit(1).execute()
+    if existente.data:
+        print(f"  [IGNORADO] '{caminho.name}' já está na base. Pulando.")
+        return 0
+
     # Etapa 1 — Extração de texto (branch por tipo de arquivo)
     if ext == ".docx":
         texto_total = extrair_texto_docx(caminho)
