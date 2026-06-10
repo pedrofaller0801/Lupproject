@@ -19,7 +19,7 @@ function extValida(nome) {
   return EXTS_ACEITAS.includes(ext)
 }
 
-export default function BaseContexto() {
+export default function BaseContexto({ onUploadChange }) {
   const [documentos,  setDocumentos]  = useState([])
   const [carregando,  setCarregando]  = useState(false)
   const [enviando,    setEnviando]    = useState(false)
@@ -101,11 +101,13 @@ export default function BaseContexto() {
     setEnviando(true)
     setErro('')
     setProgresso({ atual: 0, total: arquivos.length })
+    onUploadChange?.({ enviando: true, atual: 0, total: arquivos.length })
 
     const erros = []
 
     for (let i = 0; i < arquivos.length; i++) {
       setProgresso({ atual: i + 1, total: arquivos.length })
+      onUploadChange?.({ enviando: true, atual: i + 1, total: arquivos.length })
 
       const form = new FormData()
       form.append('arquivo', arquivos[i])
@@ -125,6 +127,7 @@ export default function BaseContexto() {
 
     setEnviando(false)
     setProgresso({ atual: 0, total: 0 })
+    onUploadChange?.({ enviando: false, atual: 0, total: 0 })
     setModoPasta(false)
     setNomeGrupo('')
 

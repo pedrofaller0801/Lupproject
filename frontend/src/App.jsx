@@ -88,6 +88,8 @@ export default function App() {
     setErro('')
   }
 
+  const [uploadInfo, setUploadInfo] = useState({ enviando: false, atual: 0, total: 0 })
+
   const carregando   = analise === 'carregando'
   const temRelatorio = analise && analise !== 'carregando'
 
@@ -191,10 +193,30 @@ export default function App() {
             <h2 className="text-base font-semibold text-gray-800 mb-5">
               Base de contexto
             </h2>
-            <BaseContexto />
+            <BaseContexto onUploadChange={setUploadInfo} />
           </div>
         )}
       </main>
+
+      {/* Barra de progresso global — visível em qualquer aba durante upload de pasta */}
+      {uploadInfo.enviando && uploadInfo.total > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 px-4 py-3 z-50">
+          <div className="max-w-4xl mx-auto flex items-center gap-4">
+            <div className="flex-1">
+              <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+                <span>Indexando manuais... {uploadInfo.atual} de {uploadInfo.total}</span>
+                <span>{Math.round((uploadInfo.atual / uploadInfo.total) * 100)}%</span>
+              </div>
+              <div className="w-full bg-slate-700 rounded-full h-1.5">
+                <div
+                  className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${(uploadInfo.atual / uploadInfo.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
