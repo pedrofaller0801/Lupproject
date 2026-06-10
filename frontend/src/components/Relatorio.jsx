@@ -3,6 +3,7 @@
  * Organiza os apontamentos por categoria e exibe o resumo geral.
  */
 
+import { useRef } from 'react'
 import Apontamento from './Apontamento'
 
 // Categorias e seus ícones
@@ -15,6 +16,23 @@ const CATEGORIAS = [
 
 export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
   const { projeto, data_analise, resumo, total_apontamentos, apontamentos = [] } = relatorio
+  const conteudoRef = useRef(null)
+
+  async function exportarPDF() {
+    const html2pdf = (await import('html2pdf.js')).default
+    const el = conteudoRef.current
+    html2pdf()
+      .set({
+        margin:      10,
+        filename:    `revisao_${projeto.replace(/\s+/g, '_')}.pdf`,
+        image:       { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, height: el.scrollHeight, windowHeight: el.scrollHeight },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:   { mode: 'avoid-all' },
+      })
+      .from(el)
+      .save()
+  }
 
   // Agrupa apontamentos por categoria
   const porCategoria = CATEGORIAS.reduce((acc, cat) => {
@@ -29,7 +47,8 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
   }, {})
 
   return (
-    <div className="print-full">
+    <div>
+    <div ref={conteudoRef}>
       {/* Cabeçalho do relatório */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -85,17 +104,21 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
         )
       })}
 
+    </div>
+
       {/* Botões de ação */}
-      <div className="flex gap-3 mt-6 no-print">
-        <button
-          onClick={onAprovar}
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
-        >
-          ✓ Aprovar e salvar na base
-        </button>
+      <div className="flex gap-3 mt-6">
+        {total_apontamentos === 0 && (
+          <button
+            onClick={onAprovar}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+          >
+            ✓ Aprovar e salvar na base
+          </button>
+        )}
 
         <button
-          onClick={() => window.print()}
+          onClick={exportarPDF}
           className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors"
         >
           Exportar PDF

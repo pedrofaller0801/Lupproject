@@ -12,7 +12,9 @@ import time
 from pathlib import Path
 
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from docx import Document
+from google import genai
+from google.genai import types as genai_types
 import tiktoken
 from supabase import create_client
 
@@ -32,14 +34,28 @@ from visao import pdf_para_imagens
 # Encoding para contagem de tokens (boa aproximação para português)
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
+# Cliente Gemini — inicializado por configurar_gemini()
+_GEMINI_CLIENT: genai.Client | None = None
+
 
 # ---------------------------------------------------------------------------
 # Funções auxiliares
 # ---------------------------------------------------------------------------
 
 def configurar_gemini() -> None:
-    """Configura a chave de API do Gemini."""
-    genai.configure(api_key=GEMINI_API_KEY)
+    """Inicializa o cliente Gemini com a chave de API (endpoint v1 estável)."""
+    global _GEMINI_CLIENT
+    _GEMINI_CLIENT = genai.Client(
+        api_key=GEMINI_API_KEY,
+        http_options={"api_version": "v1"},
+    )
+
+
+def _get_client() -> genai.Client:
+    """Retorna o cliente Gemini, inicializando-o se necessário."""
+    if _GEMINI_CLIENT is None:
+        configurar_gemini()
+    return _GEMINI_CLIENT
 
 
 def gerar_embedding_documento(texto: str) -> list[float]:
@@ -47,13 +63,16 @@ def gerar_embedding_documento(texto: str) -> list[float]:
     Gera embedding para armazenamento (task_type=RETRIEVAL_DOCUMENT).
     Adiciona delay de 0.7s para respeitar o rate limit gratuito (100 RPM).
     """
-    resultado = genai.embed_content(
-        model="models/text-embedding-004",
-        content=texto,
-        task_type="RETRIEVAL_DOCUMENT",
+    resultado = _get_client().models.embed_content(
+        model="gemini-embedding-001",
+        contents=texto,
+        config=genai_types.EmbedContentConfig(
+            task_type="RETRIEVAL_DOCUMENT",
+            output_dimensionality=768,
+        ),
     )
     time.sleep(0.7)  # ~86 RPM — dentro do limite gratuito de 100 RPM
-    return resultado["embedding"]
+    return resultado.embeddings[0].values
 
 
 def extrair_texto_paginas(caminho_pdf: Path) -> list[tuple[int, str]]:
@@ -77,6 +96,27 @@ def extrair_texto_paginas(caminho_pdf: Path) -> list[tuple[int, str]]:
             paginas.append((i, texto))
 
     return paginas
+
+
+def extrair_texto_docx(caminho: Path) -> str:
+    """
+    Extrai texto de um arquivo Word (.docx), incluindo parágrafos e tabelas.
+    """
+    doc = Document(str(caminho))
+    partes: list[str] = []
+
+    for paragrafo in doc.paragraphs:
+        txt = paragrafo.text.strip()
+        if txt:
+            partes.append(txt)
+
+    for tabela in doc.tables:
+        for linha in tabela.rows:
+            celulas = [c.text.strip() for c in linha.cells if c.text.strip()]
+            if celulas:
+                partes.append(" | ".join(celulas))
+
+    return "\n\n".join(partes)
 
 
 def chunk_texto(texto: str) -> list[str]:
@@ -104,70 +144,80 @@ def chunk_texto(texto: str) -> list[str]:
 # Pipeline principal
 # ---------------------------------------------------------------------------
 
-def indexar_documento(caminho_pdf: Path, tipo: str) -> int:
+def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int:
     """
-    Indexa um único PDF na base de contexto do Supabase.
+    Indexa um único PDF ou DOCX na base de contexto do Supabase.
 
     Fluxo:
-        1. Extrai texto com PyMuPDF
-        2. Para referências, converte páginas em imagens JPEG (cache local)
+        1. Extrai texto (PyMuPDF para PDF, python-docx para DOCX)
+        2. Para referências PDF, converte páginas em imagens JPEG (cache local)
         3. Quebra em chunks de 300 tokens / overlap 50
-        4. Gera embeddings com text-embedding-004
-        5. Salva no Supabase com tipo e metadados
+        4. Gera embeddings com gemini-embedding-001
+        5. Salva no Supabase com tipo, grupo e metadados
 
     Args:
-        caminho_pdf: Caminho para o arquivo PDF.
-        tipo:        'manual' ou 'referencia'.
+        caminho: Caminho para o arquivo PDF ou DOCX.
+        tipo:    'manual' ou 'referencia'.
+        grupo:   Nome do grupo organizacional (opcional, ex: 'Churrasqueiras').
 
     Returns:
         Número de chunks salvos no banco.
     """
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    ext = caminho.suffix.lower()
 
     print(f"\n{'─'*60}")
-    print(f"Indexando: {caminho_pdf.name}  (tipo: {tipo})")
+    print(f"Indexando: {caminho.name}  (tipo: {tipo})")
     print(f"{'─'*60}")
 
-    # Etapa 1 — Extração de texto
-    paginas = extrair_texto_paginas(caminho_pdf)
+    # Etapa 1 — Extração de texto (branch por tipo de arquivo)
+    if ext == ".docx":
+        texto_total = extrair_texto_docx(caminho)
+        if len(texto_total) < MIN_CHARS_PAGINA:
+            print("  [AVISO] Nenhum texto extraível no DOCX. Pulando.")
+            return 0
+    else:  # .pdf
+        paginas = extrair_texto_paginas(caminho)
 
-    # Etapa 2 — Para referências, gera cache de imagens
-    if tipo == "referencia":
-        print("  Convertendo páginas em imagens (300 DPI)...")
-        imagens_geradas = pdf_para_imagens(caminho_pdf)
-        print(f"  {len(imagens_geradas)} imagem(ns) salva(s) em imagens_cache/{caminho_pdf.stem}/")
+        # Etapa 2 — Para referências PDF, gera cache de imagens
+        if tipo == "referencia":
+            print("  Convertendo páginas em imagens (300 DPI)...")
+            imagens_geradas = pdf_para_imagens(caminho)
+            print(f"  {len(imagens_geradas)} imagem(ns) salva(s) em imagens_cache/{caminho.stem}/")
 
-    # Etapa 3 — Filtra páginas com texto e concatena
-    paginas_com_texto = [
-        f"[Página {n}]\n{t}"
-        for n, t in paginas
-        if len(t) >= MIN_CHARS_PAGINA
-    ]
+        paginas_com_texto = [
+            f"[Página {n}]\n{t}"
+            for n, t in paginas
+            if len(t) >= MIN_CHARS_PAGINA
+        ]
 
-    if not paginas_com_texto:
-        print("  [AVISO] Nenhuma página com texto suficiente. Pulando chunking.")
-        return 0
+        if not paginas_com_texto:
+            print("  [AVISO] Nenhuma página com texto suficiente. Pulando chunking.")
+            return 0
 
-    texto_total = "\n\n".join(paginas_com_texto)
+        texto_total = "\n\n".join(paginas_com_texto)
 
-    # Etapa 4 — Chunking
+    # Etapa 3 — Chunking
     chunks = chunk_texto(texto_total)
-    print(f"  {len(paginas_com_texto)} página(s) com texto → {len(chunks)} chunk(s).")
+    print(f"  {len(chunks)} chunk(s) gerado(s).")
 
-    # Etapa 5 — Embeddings e inserção no banco
+    # Etapa 4 — Embeddings e inserção no banco
     print(f"  Gerando embeddings e salvando no Supabase...")
     total_salvos = 0
 
     for i, chunk in enumerate(chunks):
         embedding = gerar_embedding_documento(chunk)
 
-        supabase.table("documentos").insert({
+        row: dict = {
             "tipo":         tipo,
-            "nome_arquivo": caminho_pdf.name,
+            "nome_arquivo": caminho.name,
             "chunk_index":  i,
             "conteudo":     chunk,
             "embedding":    embedding,
-        }).execute()
+        }
+        if grupo:
+            row["grupo"] = grupo
+        supabase.table("documentos").insert(row).execute()
 
         total_salvos += 1
         print(f"  Chunk {total_salvos}/{len(chunks)} salvo.", end="\r")
@@ -176,7 +226,13 @@ def indexar_documento(caminho_pdf: Path, tipo: str) -> int:
     return total_salvos
 
 
-def indexar_bytes(nome_arquivo: str, conteudo: bytes, tipo: str, relatorio: str | None = None) -> int:
+def indexar_bytes(
+    nome_arquivo: str,
+    conteudo:     bytes,
+    tipo:         str,
+    relatorio:    str | None = None,
+    grupo:        str | None = None,
+) -> int:
     """
     Versão do indexar_documento que aceita bytes diretamente (para uso via API).
 
@@ -184,10 +240,11 @@ def indexar_bytes(nome_arquivo: str, conteudo: bytes, tipo: str, relatorio: str 
     Se relatorio (JSON string) for fornecido, indexa também como chunk especial.
 
     Args:
-        nome_arquivo: Nome original do arquivo PDF.
-        conteudo:     Bytes do PDF.
+        nome_arquivo: Nome original do arquivo.
+        conteudo:     Bytes do arquivo.
         tipo:         'manual' ou 'referencia'.
         relatorio:    JSON do relatório de revisão (opcional, apenas para referências aprovadas).
+        grupo:        Nome do grupo organizacional (opcional, ex: 'Churrasqueiras').
 
     Returns:
         Número total de chunks salvos.
@@ -195,17 +252,19 @@ def indexar_bytes(nome_arquivo: str, conteudo: bytes, tipo: str, relatorio: str 
     import tempfile
     import os
 
-    # Salva temporariamente para usar o pipeline de ingestão baseado em Path
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False, prefix="rag_") as tmp:
+    # Usa apenas o nome do arquivo (sem subpastas) — uploads de pasta enviam caminhos relativos
+    nome_base = Path(nome_arquivo).name
+    ext = Path(nome_base).suffix.lower() or ".pdf"
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False, prefix="rag_") as tmp:
         tmp.write(conteudo)
         tmp_path = Path(tmp.name)
 
-    # Renomeia para preservar o nome original (necessário para o cache de imagens)
-    destino = tmp_path.parent / nome_arquivo
+    # Renomeia para preservar o nome do arquivo (necessário para o cache de imagens)
+    destino = tmp_path.parent / nome_base
     tmp_path.rename(destino)
 
     try:
-        total = indexar_documento(destino, tipo)
+        total = indexar_documento(destino, tipo, grupo)
 
         # Se veio com relatório de aprovação, indexa o conteúdo do relatório também
         if relatorio and tipo == "referencia":
@@ -236,19 +295,21 @@ def indexar_bytes(nome_arquivo: str, conteudo: bytes, tipo: str, relatorio: str 
 # ---------------------------------------------------------------------------
 
 def _indexar_diretorio(tipo: str) -> None:
-    """Indexa todos os PDFs do diretório correspondente ao tipo."""
+    """Indexa todos os PDFs e DOCXs do diretório correspondente ao tipo (recursivo)."""
     pasta = DIR_MANUAL if tipo == "manual" else DIR_PROJETOS
-    pdfs = sorted(pasta.glob("*.pdf"))
+    arquivos = sorted(
+        list(pasta.rglob("*.pdf")) + list(pasta.rglob("*.docx"))
+    )
 
-    if not pdfs:
-        print(f"Nenhum PDF encontrado em: {pasta}")
-        print(f"Adicione arquivos PDF nessa pasta e execute novamente.")
+    if not arquivos:
+        print(f"Nenhum PDF ou DOCX encontrado em: {pasta}")
+        print(f"Adicione arquivos nessa pasta e execute novamente.")
         return
 
-    print(f"Encontrados {len(pdfs)} PDF(s) em {pasta.name}/")
+    print(f"Encontrados {len(arquivos)} arquivo(s) em {pasta.name}/ (incluindo subpastas)")
     total_geral = 0
 
-    for caminho in pdfs:
+    for caminho in arquivos:
         total_geral += indexar_documento(caminho, tipo)
 
     print(f"\n{'='*60}")

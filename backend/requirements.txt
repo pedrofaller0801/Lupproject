@@ -1,12 +1,13 @@
 # LLM + Embeddings
-google-generativeai>=0.8.0
+google-genai>=0.8.0
 
 # Banco de dados vetorial
 supabase>=2.9.0
 
-# Extração e renderização de PDF
+# Extração e renderização de PDF e documentos Word
 PyMuPDF>=1.24.0
 Pillow>=11.0.0
+python-docx>=1.1.0
 
 # Tokenização
 tiktoken>=0.7.0

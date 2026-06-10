@@ -6,9 +6,12 @@ Execução:
 """
 
 import json
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from supabase import create_client
 
 from config import SUPABASE_KEY, SUPABASE_URL, validar_config
@@ -90,19 +93,20 @@ async def base_upload(
     arquivo:   UploadFile = File(...),
     tipo:      str        = Form(...),
     relatorio: str | None = Form(default=None),
+    grupo:     str | None = Form(default=None),
 ):
     """
     Adiciona um documento à base de contexto.
 
     Parâmetros:
-        arquivo:   PDF do manual ou projeto de referência.
+        arquivo:   PDF ou DOCX do manual ou projeto de referência.
         tipo:      'manual' ou 'referencia'.
         relatorio: JSON do relatório de revisão (opcional).
-                   Quando fornecido junto com tipo='referencia', o relatório
-                   é indexado como contexto adicional (Fase 6 — aprovação).
+        grupo:     Nome do grupo organizacional (opcional, ex: 'Churrasqueiras').
     """
-    if not arquivo.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=422, detail="Apenas arquivos PDF são aceitos.")
+    ext = arquivo.filename.lower().rsplit(".", 1)[-1] if "." in arquivo.filename else ""
+    if ext not in ("pdf", "docx"):
+        raise HTTPException(status_code=422, detail="Apenas arquivos PDF ou DOCX são aceitos.")
 
     if tipo not in ("manual", "referencia"):
         raise HTTPException(
@@ -115,12 +119,15 @@ async def base_upload(
     if len(conteudo) == 0:
         raise HTTPException(status_code=422, detail="O arquivo enviado está vazio.")
 
+    grupo_limpo = grupo.strip() if grupo and grupo.strip() else None
+
     try:
-        total = indexar_bytes(arquivo.filename, conteudo, tipo, relatorio)
+        total = indexar_bytes(arquivo.filename, conteudo, tipo, relatorio, grupo_limpo)
         return {
             "mensagem":     f"{total} chunk(s) indexado(s) com sucesso.",
             "nome_arquivo": arquivo.filename,
             "tipo":         tipo,
+            "grupo":        grupo_limpo,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na indexação: {str(e)}")
@@ -135,7 +142,7 @@ async def base_listar():
     sb = _supabase()
     resposta = (
         sb.table("documentos")
-        .select("id, tipo, nome_arquivo, chunk_index, criado_em")
+        .select("id, tipo, nome_arquivo, chunk_index, criado_em, grupo")
         .order("criado_em", desc=True)
         .execute()
     )
@@ -151,10 +158,19 @@ async def base_listar():
                 "nome_arquivo": nome,
                 "total_chunks": 0,
                 "criado_em":    row["criado_em"],
+                "grupo":        row.get("grupo"),
             }
         docs[nome]["total_chunks"] += 1
 
     return {"total": len(docs), "documentos": list(docs.values())}
+
+
+@app.delete("/base/grupo/{nome_grupo}")
+async def base_deletar_grupo(nome_grupo: str):
+    """Remove todos os chunks de todos os documentos de um grupo."""
+    sb = _supabase()
+    sb.table("documentos").delete().eq("grupo", nome_grupo).execute()
+    return {"mensagem": f"Grupo '{nome_grupo}' removido da base com sucesso."}
 
 
 @app.delete("/base/{documento_id}")
@@ -183,7 +199,7 @@ async def base_deletar(documento_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
-async def health():
+async def health():  # noqa: E302
     """Verifica se o servidor e as conexões externas estão operacionais."""
     supabase_ok = False
     try:
@@ -197,3 +213,18 @@ async def health():
         "status":   "ok" if supabase_ok else "degradado",
         "supabase": supabase_ok,
     }
+
+
+# ---------------------------------------------------------------------------
+# Frontend estático — deve vir depois de todas as rotas da API
+# ---------------------------------------------------------------------------
+
+_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+
+if _DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        """Retorna o index.html para qualquer rota não reconhecida (SPA)."""
+        return FileResponse(str(_DIST / "index.html"))

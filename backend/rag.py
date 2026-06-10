@@ -3,22 +3,63 @@ Busca vetorial no Supabase e geração do relatório de revisão com Gemini.
 """
 
 import json
+import re
+import time
 from datetime import date
 
 import fitz  # PyMuPDF
-import google.generativeai as genai
-from PIL import Image
-import io
+from google.genai import types as genai_types
 from supabase import create_client
 
 from config import (
-    GEMINI_API_KEY,
     MAX_CHUNKS_MANUAL,
     MAX_CHUNKS_REFERENCIA,
     SUPABASE_KEY,
     SUPABASE_URL,
 )
-from ingestao import configurar_gemini
+from ingestao import _get_client
+
+
+_MODELOS_FALLBACK = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
+
+def _gerar_conteudo_com_retry(
+    model:    str,
+    contents: list,
+    max_tentativas: int = 3,
+):
+    """
+    Chama generate_content com retry automático para erros transitórios.
+    Em 429 aguarda o retryDelay indicado pela API.
+    Em 503 aguarda 10s entre tentativas.
+    Após esgotar tentativas no modelo principal, tenta o fallback.
+    """
+    modelos = [model] + [m for m in _MODELOS_FALLBACK if m != model]
+
+    for modelo_atual in modelos:
+        for tentativa in range(max_tentativas):
+            try:
+                return _get_client().models.generate_content(
+                    model=modelo_atual, contents=contents
+                )
+            except Exception as e:
+                msg = str(e)
+                eh_transitorio = any(c in msg for c in ("429", "503", "RESOURCE_EXHAUSTED", "UNAVAILABLE"))
+                ultima_tentativa = tentativa == max_tentativas - 1
+
+                if not eh_transitorio or ultima_tentativa:
+                    if modelo_atual == modelos[-1]:
+                        raise
+                    break  # tenta próximo modelo
+
+                if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
+                    match = re.search(r"retryDelay.*?(\d+)s", msg)
+                    espera = int(match.group(1)) + 2 if match else 35 * (tentativa + 1)
+                else:
+                    espera = 10 * (tentativa + 1)
+
+                print(f"  [{msg[:3]}] {modelo_atual} indisponível — aguardando {espera}s (tentativa {tentativa + 1}/{max_tentativas})...")
+                time.sleep(espera)
 
 
 # ---------------------------------------------------------------------------
@@ -30,13 +71,15 @@ def gerar_embedding_consulta(texto: str) -> list[float]:
     Gera embedding para consulta (task_type=RETRIEVAL_QUERY).
     Usado ao analisar um novo projeto — diferente do RETRIEVAL_DOCUMENT da ingestão.
     """
-    configurar_gemini()
-    resultado = genai.embed_content(
-        model="models/text-embedding-004",
-        content=texto,
-        task_type="RETRIEVAL_QUERY",
+    resultado = _get_client().models.embed_content(
+        model="gemini-embedding-001",
+        contents=texto,
+        config=genai_types.EmbedContentConfig(
+            task_type="RETRIEVAL_QUERY",
+            output_dimensionality=768,
+        ),
     )
-    return resultado["embedding"]
+    return resultado.embeddings[0].values
 
 
 # ---------------------------------------------------------------------------
@@ -189,8 +232,6 @@ def analisar_projeto(
         json.JSONDecodeError: Se o modelo retornar JSON malformado.
         Exception:            Se a chamada à API Gemini falhar.
     """
-    configurar_gemini()
-
     # Etapa 1 — Extração de texto do PDF
     texto_paginas: list[str] = []
     with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
@@ -214,14 +255,14 @@ def analisar_projeto(
     prompt = montar_prompt(nome_arquivo, texto_projeto, chunks_manual, chunks_ref)
 
     # Etapa 5 — Chamada ao Gemini com texto + imagens
-    modelo = genai.GenerativeModel("gemini-2.0-flash")
-
-    # O prompt textual é o primeiro elemento; as imagens vêm a seguir
-    conteudo: list = [prompt]
+    conteudo: list[genai_types.Part] = [genai_types.Part.from_text(text=prompt)]
     for img_bytes in imagens:
-        conteudo.append(Image.open(io.BytesIO(img_bytes)))
+        conteudo.append(genai_types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg"))
 
-    resposta = modelo.generate_content(conteudo)
+    resposta = _gerar_conteudo_com_retry(
+        model="gemini-2.5-flash",
+        contents=conteudo,
+    )
     texto_resposta = resposta.text.strip()
 
     # Remove bloco Markdown ```json ... ``` caso o modelo o adicione
