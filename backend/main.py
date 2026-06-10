@@ -64,8 +64,12 @@ async def verificar_acesso(request: Request, call_next):
 
 @app.post("/auth")
 async def autenticar(dados: dict):
-    """Valida a senha e retorna o token de sessão."""
-    if _ACESSO_SENHA and dados.get("senha") == _ACESSO_SENHA:
+    """Valida a senha e retorna o token de sessão.
+    Se ACESSO_SENHA não estiver configurada, qualquer senha é aceita (modo dev).
+    """
+    if not _ACESSO_SENHA:
+        return {"token": "dev"}
+    if dados.get("senha") == _ACESSO_SENHA:
         return {"token": hashlib.sha256(_ACESSO_SENHA.encode()).hexdigest()}
     raise HTTPException(status_code=401, detail="Senha incorreta.")
 

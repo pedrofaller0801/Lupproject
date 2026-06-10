@@ -95,17 +95,20 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       {/* Cabeçalho */}
-      <header className="bg-white border-b border-gray-200 shadow-sm no-print">
+      <header className="bg-slate-900 border-b border-slate-800 no-print">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">Revisor de Projetos</h1>
-            <p className="text-xs text-gray-500">Sistema RAG · Gemini 2.5 Flash</p>
+          <div className="flex items-center gap-2">
+            <span className="text-indigo-400 text-base">◈</span>
+            <div>
+              <h1 className="text-white text-sm font-bold tracking-tight leading-none">Revisor de Projetos</h1>
+              <p className="text-slate-500 text-xs mt-0.5">Sistema RAG · Gemini 2.5 Flash</p>
+            </div>
           </div>
           <button
             onClick={() => { clearToken(); setAutenticado(false) }}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
           >
             Sair
           </button>
@@ -120,16 +123,18 @@ export default function App() {
               key={secao.id}
               onClick={() => { setSecaoAtiva(secao.id); handleDescartar() }}
               className={`
-                flex-1 py-3 px-4 rounded-xl text-left transition-all border
+                flex-1 py-3 px-4 rounded-xl text-left transition-all
                 ${secaoAtiva === secao.id
-                  ? 'bg-white border-blue-500 shadow-sm'
-                  : 'bg-gray-50 border-gray-200 hover:bg-white'}
+                  ? 'bg-indigo-600 shadow-lg shadow-indigo-200'
+                  : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}
               `}
             >
-              <p className={`text-sm font-semibold ${secaoAtiva === secao.id ? 'text-blue-600' : 'text-gray-700'}`}>
+              <p className={`text-sm font-semibold ${secaoAtiva === secao.id ? 'text-white' : 'text-gray-700'}`}>
                 {secao.label}
               </p>
-              <p className="text-xs text-gray-400">{secao.sub}</p>
+              <p className={`text-xs mt-0.5 ${secaoAtiva === secao.id ? 'text-indigo-200' : 'text-gray-400'}`}>
+                {secao.sub}
+              </p>
             </button>
           ))}
         </nav>
