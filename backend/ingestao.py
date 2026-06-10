@@ -58,21 +58,38 @@ def _get_client() -> genai.Client:
     return _GEMINI_CLIENT
 
 
-def gerar_embedding_documento(texto: str) -> list[float]:
+def gerar_embedding_documento(texto: str, max_tentativas: int = 5) -> list[float]:
     """
     Gera embedding para armazenamento (task_type=RETRIEVAL_DOCUMENT).
-    Adiciona delay de 0.7s para respeitar o rate limit gratuito (100 RPM).
+    Faz retry automático em caso de 429, aguardando o retryDelay sugerido pela API.
     """
-    resultado = _get_client().models.embed_content(
-        model="gemini-embedding-001",
-        contents=texto,
-        config=genai_types.EmbedContentConfig(
-            task_type="RETRIEVAL_DOCUMENT",
-            output_dimensionality=768,
-        ),
-    )
-    time.sleep(0.7)  # ~86 RPM — dentro do limite gratuito de 100 RPM
-    return resultado.embeddings[0].values
+    import re as _re
+
+    for tentativa in range(max_tentativas):
+        try:
+            resultado = _get_client().models.embed_content(
+                model="gemini-embedding-001",
+                contents=texto,
+                config=genai_types.EmbedContentConfig(
+                    task_type="RETRIEVAL_DOCUMENT",
+                    output_dimensionality=768,
+                ),
+            )
+            time.sleep(1.0)  # pausa mínima entre chamadas
+            return resultado.embeddings[0].values
+
+        except Exception as e:
+            msg = str(e)
+            eh_transitorio = any(c in msg for c in ("429", "RESOURCE_EXHAUSTED"))
+            ultima = tentativa == max_tentativas - 1
+
+            if not eh_transitorio or ultima:
+                raise
+
+            match = _re.search(r"retryDelay.*?(\d+)s", msg)
+            espera = int(match.group(1)) + 3 if match else 60 * (tentativa + 1)
+            print(f"  [429] Embedding throttled — aguardando {espera}s (tentativa {tentativa + 1}/{max_tentativas})...")
+            time.sleep(espera)
 
 
 def extrair_texto_paginas(caminho_pdf: Path) -> list[tuple[int, str]]:
