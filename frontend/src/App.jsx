@@ -143,9 +143,16 @@ export default function App() {
         {/* Seção: Novo Projeto */}
         {secaoAtiva === 'projeto' && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-5">
+            <h2 className="text-base font-semibold text-gray-800 mb-3">
               Enviar projeto para revisão
             </h2>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 flex gap-3">
+              <span className="text-amber-500 text-base leading-tight mt-0.5">⚠</span>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                <span className="font-semibold">Revisão assistida por IA.</span> Os apontamentos gerados são sugestões automáticas — sempre revise a coerência da análise antes de aplicar qualquer alteração no projeto.
+              </p>
+            </div>
 
             {/* Mensagem de erro */}
             {erro && (
