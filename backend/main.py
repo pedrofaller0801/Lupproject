@@ -84,7 +84,10 @@ def _supabase():
 # ---------------------------------------------------------------------------
 
 @app.post("/analisar")
-async def analisar(arquivo: UploadFile = File(...)):
+async def analisar(
+    arquivo:       UploadFile = File(...),
+    tipo_projeto:  str        = Form(default="arquitetonico"),
+):
     """
     Recebe um PDF de projeto novo, executa a análise RAG + IA e retorna o relatório.
 
@@ -105,7 +108,7 @@ async def analisar(arquivo: UploadFile = File(...)):
 
     try:
         imagens = pdf_bytes_para_imagens(conteudo)
-        relatorio = analisar_projeto(conteudo, arquivo.filename, imagens)
+        relatorio = analisar_projeto(conteudo, arquivo.filename, imagens, tipo_projeto)
         return relatorio
 
     except json.JSONDecodeError:

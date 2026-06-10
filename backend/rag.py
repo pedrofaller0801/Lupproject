@@ -123,6 +123,7 @@ def montar_prompt(
     texto_projeto:  str,
     chunks_manual:  list[dict],
     chunks_ref:     list[dict],
+    tipo_projeto:   str = "arquitetonico",
 ) -> str:
     """
     Monta o prompt completo para o Gemini combinar contexto textual com as imagens.
@@ -152,9 +153,11 @@ def montar_prompt(
         bloco_ref = "Nenhuma referência disponível na base ainda."
 
     hoje = date.today().isoformat()
+    tipo_label = "interiores" if tipo_projeto == "interiores" else "arquitetura"
 
-    return f"""Você é um arquiteto revisor experiente. Analise o projeto de arquitetura \
-fornecido (texto extraído + imagens das pranchas) e gere um relatório de revisão detalhado.
+    return f"""Você é um arquiteto revisor experiente especializado em projetos de {tipo_label}. \
+Analise o projeto de {tipo_label} fornecido (texto extraído + imagens das pranchas) \
+e gere um relatório de revisão detalhado.
 
 ## CRITÉRIOS DO MANUAL DO ESCRITÓRIO
 {bloco_manual}
@@ -170,6 +173,14 @@ fornecido (texto extraído + imagens das pranchas) e gere um relatório de revis
 ## INSTRUÇÃO
 Com base nos critérios do manual, nos exemplos de referência e nas imagens das pranchas,
 identifique os problemas concretos do projeto. Não invente problemas sem evidência.
+
+### Verificação obrigatória — Consistência de áreas e medidas
+Esta é uma das análises mais importantes. Para cada ambiente do projeto:
+1. Leia as cotas (medidas em metros) indicadas nas pranchas.
+2. Calcule a área resultante (largura × comprimento) e compare com a área informada na legenda ou no quadro de áreas.
+3. Se houver divergência (ex: cota indica 3,00 × 4,00 = 12,00 m² mas a legenda diz 14,00 m²), registre como apontamento de severidade alta.
+4. Verifique também se a soma das áreas dos ambientes é coerente com a área total do pavimento.
+5. Aplique este critério tanto para projetos arquitetônicos (área útil, área de construção) quanto para projetos de interiores (layout, circulação mínima, proporção dos móveis em relação ao ambiente).
 
 Retorne EXCLUSIVAMENTE o JSON abaixo, sem nenhum texto antes ou depois:
 
@@ -208,6 +219,7 @@ def analisar_projeto(
     pdf_bytes:    bytes,
     nome_arquivo: str,
     imagens:      list[bytes],
+    tipo_projeto: str = "arquitetonico",
 ) -> dict:
     """
     Pipeline completo de análise RAG + Gemini Vision.
@@ -252,7 +264,7 @@ def analisar_projeto(
     chunks_ref    = buscar_chunks(embedding, "referencia", MAX_CHUNKS_REFERENCIA)
 
     # Etapa 4 — Montagem do prompt
-    prompt = montar_prompt(nome_arquivo, texto_projeto, chunks_manual, chunks_ref)
+    prompt = montar_prompt(nome_arquivo, texto_projeto, chunks_manual, chunks_ref, tipo_projeto)
 
     # Etapa 5 — Chamada ao Gemini com texto + imagens
     conteudo: list[genai_types.Part] = [genai_types.Part.from_text(text=prompt)]
@@ -273,5 +285,6 @@ def analisar_projeto(
     # Etapa 6 — Parse e correção do total_apontamentos
     relatorio = json.loads(texto_resposta)
     relatorio["total_apontamentos"] = len(relatorio.get("apontamentos", []))
+    relatorio["tipo_projeto"] = tipo_projeto
 
     return relatorio

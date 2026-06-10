@@ -4,10 +4,16 @@
 
 import { useState, useRef } from 'react'
 
+const TIPOS_PROJETO = [
+  { id: 'arquitetonico', label: 'Arquitetônico' },
+  { id: 'interiores',    label: 'Interiores'    },
+]
+
 export default function Upload({ onAnalisar, carregando }) {
-  const [arquivo, setArquivo]       = useState(null)
-  const [arrastando, setArrastando] = useState(false)
-  const inputRef                    = useRef(null)
+  const [arquivo,      setArquivo]      = useState(null)
+  const [arrastando,   setArrastando]   = useState(false)
+  const [tipoProjeto,  setTipoProjeto]  = useState('arquitetonico')
+  const inputRef                        = useRef(null)
 
   // Aceita arquivo via seleção ou drag & drop
   function processarArquivo(file) {
@@ -30,11 +36,33 @@ export default function Upload({ onAnalisar, carregando }) {
   }
 
   function handleAnalisar() {
-    if (arquivo) onAnalisar(arquivo)
+    if (arquivo) onAnalisar(arquivo, tipoProjeto)
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Tipo de projeto */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-widest mb-2">
+          Tipo de projeto
+        </p>
+        <div className="flex gap-2">
+          {TIPOS_PROJETO.map(t => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTipoProjeto(t.id)}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium border transition-all
+                ${tipoProjeto === t.id
+                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Zona de drop */}
       <div
         onDragOver={e => { e.preventDefault(); setArrastando(true) }}

@@ -26,12 +26,13 @@ export default function App() {
   const [aprovando,   setAprovando]   = useState(false)
 
   // Inicia a análise do PDF enviado
-  async function handleAnalisar(arquivo) {
+  async function handleAnalisar(arquivo, tipoProjeto = 'arquitetonico') {
     setErro('')
     setAnalise('carregando')
 
     const form = new FormData()
-    form.append('arquivo', arquivo)
+    form.append('arquivo',       arquivo)
+    form.append('tipo_projeto',  tipoProjeto)
 
     try {
       const res = await apiFetch('/analisar', {
