@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import { apiFetch } from '../api'
 
 const TIPO_LABEL = {
   manual:     { label: 'Manual',     badge: 'bg-purple-100 text-purple-700' },
@@ -38,7 +39,7 @@ export default function BaseContexto() {
   async function carregarLista() {
     setCarregando(true)
     try {
-      const res = await fetch('/base/listar')
+      const res = await apiFetch('/base/listar')
       const data = await res.json()
       setDocumentos(data.documentos || [])
     } catch {
@@ -65,7 +66,7 @@ export default function BaseContexto() {
     form.append('tipo', tipo)
 
     try {
-      const res = await fetch('/base/upload', { method: 'POST', body: form })
+      const res = await apiFetch('/base/upload', { method: 'POST', body: form })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Erro ao enviar.')
@@ -112,7 +113,7 @@ export default function BaseContexto() {
       form.append('grupo', grupoFinal)
 
       try {
-        const res = await fetch('/base/upload', { method: 'POST', body: form })
+        const res = await apiFetch('/base/upload', { method: 'POST', body: form })
         if (!res.ok) {
           const data = await res.json()
           erros.push(`${arquivos[i].name}: ${data.detail || 'Erro ao enviar.'}`)
@@ -137,7 +138,7 @@ export default function BaseContexto() {
   async function handleRemover(id, nome) {
     if (!confirm(`Remover "${nome}" da base?`)) return
     try {
-      await fetch(`/base/${id}`, { method: 'DELETE' })
+      await apiFetch(`/base/${id}`, { method: 'DELETE' })
       setDocumentos(prev => prev.filter(d => d.id !== id))
     } catch {
       setErro('Erro ao remover o documento.')
@@ -155,7 +156,7 @@ export default function BaseContexto() {
   async function handleRemoverGrupo(nome) {
     if (!confirm(`Remover todos os arquivos do grupo "${nome}"?`)) return
     try {
-      await fetch(`/base/grupo/${encodeURIComponent(nome)}`, { method: 'DELETE' })
+      await apiFetch(`/base/grupo/${encodeURIComponent(nome)}`, { method: 'DELETE' })
       await carregarLista()
     } catch {
       setErro('Erro ao remover o grupo.')

@@ -5,12 +5,14 @@ Execução:
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
 """
 
+import hashlib
 import json
+import os
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client
 
@@ -39,6 +41,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_ACESSO_SENHA = os.getenv("ACESSO_SENHA", "")
+
+
+@app.middleware("http")
+async def verificar_acesso(request: Request, call_next):
+    """Protege as rotas de API com token de acesso quando ACESSO_SENHA está configurada."""
+    if not _ACESSO_SENHA:
+        return await call_next(request)
+
+    caminho = request.url.path
+    if caminho.startswith(("/analisar", "/base")):
+        token    = request.headers.get("X-Access-Token", "")
+        esperado = hashlib.sha256(_ACESSO_SENHA.encode()).hexdigest()
+        if token != esperado:
+            return JSONResponse({"detail": "Não autorizado."}, status_code=401)
+
+    return await call_next(request)
+
+
+@app.post("/auth")
+async def autenticar(dados: dict):
+    """Valida a senha e retorna o token de sessão."""
+    if _ACESSO_SENHA and dados.get("senha") == _ACESSO_SENHA:
+        return {"token": hashlib.sha256(_ACESSO_SENHA.encode()).hexdigest()}
+    raise HTTPException(status_code=401, detail="Senha incorreta.")
 
 
 def _supabase():

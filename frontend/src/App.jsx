@@ -9,6 +9,8 @@ import { useState } from 'react'
 import Upload       from './components/Upload'
 import Relatorio    from './components/Relatorio'
 import BaseContexto from './components/BaseContexto'
+import Login        from './components/Login'
+import { apiFetch, getToken, clearToken } from './api'
 
 // Seções disponíveis na navegação
 const SECOES = [
@@ -17,7 +19,12 @@ const SECOES = [
 ]
 
 export default function App() {
-  const [secaoAtiva, setSecaoAtiva] = useState('projeto')
+  const [autenticado, setAutenticado] = useState(!!getToken())
+  const [secaoAtiva,  setSecaoAtiva]  = useState('projeto')
+
+  if (!autenticado) {
+    return <Login onLogin={() => setAutenticado(true)} />
+  }
 
   // Estado da análise: null | 'carregando' | { relatorio, arquivo }
   const [analise,  setAnalise]  = useState(null)
@@ -33,10 +40,10 @@ export default function App() {
     form.append('arquivo', arquivo)
 
     try {
-      const res = await fetch('/analisar', {
+      const res = await apiFetch('/analisar', {
         method: 'POST',
         body: form,
-        signal: AbortSignal.timeout(120_000),  // 2 minutos de timeout
+        signal: AbortSignal.timeout(120_000),
       })
 
       if (!res.ok) {
@@ -66,7 +73,7 @@ export default function App() {
     form.append('relatorio', JSON.stringify(analise.relatorio))
 
     try {
-      const res = await fetch('/base/upload', { method: 'POST', body: form })
+      const res = await apiFetch('/base/upload', { method: 'POST', body: form })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Erro ao salvar na base.')
@@ -96,8 +103,14 @@ export default function App() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-lg font-bold text-gray-900">Revisor de Projetos</h1>
-            <p className="text-xs text-gray-500">Sistema RAG · Gemini 2.0 Flash</p>
+            <p className="text-xs text-gray-500">Sistema RAG · Gemini 2.5 Flash</p>
           </div>
+          <button
+            onClick={() => { clearToken(); setAutenticado(false) }}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Sair
+          </button>
         </div>
       </header>
 
