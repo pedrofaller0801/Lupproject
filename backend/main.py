@@ -158,7 +158,7 @@ async def base_upload(
     grupo_limpo = grupo.strip() if grupo and grupo.strip() else None
 
     try:
-        total = indexar_bytes(arquivo.filename, conteudo, tipo, relatorio, grupo_limpo)
+        total = await indexar_bytes(arquivo.filename, conteudo, tipo, relatorio, grupo_limpo)
         return {
             "mensagem":     f"{total} chunk(s) indexado(s) com sucesso.",
             "nome_arquivo": arquivo.filename,

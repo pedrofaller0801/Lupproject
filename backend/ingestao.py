@@ -58,12 +58,13 @@ def _get_client() -> genai.Client:
     return _GEMINI_CLIENT
 
 
-def gerar_embedding_documento(texto: str, max_tentativas: int = 5) -> list[float]:
+async def gerar_embedding_documento(texto: str, max_tentativas: int = 5) -> list[float]:
     """
     Gera embedding para armazenamento (task_type=RETRIEVAL_DOCUMENT).
-    Faz retry automático em caso de 429, aguardando o retryDelay sugerido pela API.
+    Faz retry automático em caso de 429, usando asyncio.sleep para não bloquear o servidor.
     """
     import re as _re
+    import asyncio
 
     for tentativa in range(max_tentativas):
         try:
@@ -75,7 +76,7 @@ def gerar_embedding_documento(texto: str, max_tentativas: int = 5) -> list[float
                     output_dimensionality=768,
                 ),
             )
-            time.sleep(1.0)  # pausa mínima entre chamadas
+            await asyncio.sleep(1.0)  # pausa mínima sem bloquear o servidor
             return resultado.embeddings[0].values
 
         except Exception as e:
@@ -89,7 +90,7 @@ def gerar_embedding_documento(texto: str, max_tentativas: int = 5) -> list[float
             match = _re.search(r"retryDelay.*?(\d+)s", msg)
             espera = int(match.group(1)) + 3 if match else 60 * (tentativa + 1)
             print(f"  [429] Embedding throttled — aguardando {espera}s (tentativa {tentativa + 1}/{max_tentativas})...")
-            time.sleep(espera)
+            await asyncio.sleep(espera)
 
 
 def extrair_texto_paginas(caminho_pdf: Path) -> list[tuple[int, str]]:
@@ -161,7 +162,7 @@ def chunk_texto(texto: str) -> list[str]:
 # Pipeline principal
 # ---------------------------------------------------------------------------
 
-def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int:
+async def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int:
     """
     Indexa um único PDF ou DOCX na base de contexto do Supabase.
 
@@ -229,7 +230,7 @@ def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int
     total_salvos = 0
 
     for i, chunk in enumerate(chunks):
-        embedding = gerar_embedding_documento(chunk)
+        embedding = await gerar_embedding_documento(chunk)
 
         row: dict = {
             "tipo":         tipo,
@@ -249,7 +250,7 @@ def indexar_documento(caminho: Path, tipo: str, grupo: str | None = None) -> int
     return total_salvos
 
 
-def indexar_bytes(
+async def indexar_bytes(
     nome_arquivo: str,
     conteudo:     bytes,
     tipo:         str,
@@ -287,12 +288,12 @@ def indexar_bytes(
     tmp_path.rename(destino)
 
     try:
-        total = indexar_documento(destino, tipo, grupo)
+        total = await indexar_documento(destino, tipo, grupo)
 
         # Se veio com relatório de aprovação, indexa o conteúdo do relatório também
         if relatorio and tipo == "referencia":
             supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-            embedding = gerar_embedding_documento(relatorio[:2000])
+            embedding = await gerar_embedding_documento(relatorio[:2000])
 
             supabase.table("documentos").insert({
                 "tipo":         "referencia",
@@ -317,7 +318,7 @@ def indexar_bytes(
 # Interface de linha de comando
 # ---------------------------------------------------------------------------
 
-def _indexar_diretorio(tipo: str) -> None:
+async def _indexar_diretorio(tipo: str) -> None:
     """Indexa todos os PDFs e DOCXs do diretório correspondente ao tipo (recursivo)."""
     pasta = DIR_MANUAL if tipo == "manual" else DIR_PROJETOS
     arquivos = sorted(
@@ -333,7 +334,7 @@ def _indexar_diretorio(tipo: str) -> None:
     total_geral = 0
 
     for caminho in arquivos:
-        total_geral += indexar_documento(caminho, tipo)
+        total_geral += await indexar_documento(caminho, tipo)
 
     print(f"\n{'='*60}")
     print(f"Ingestão concluída. Total: {total_geral} chunk(s) no banco.")
@@ -358,10 +359,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    import asyncio
     try:
         validar_config()
         configurar_gemini()
-        _indexar_diretorio(args.tipo)
+        asyncio.run(_indexar_diretorio(args.tipo))
     except EnvironmentError as e:
         print(f"\nErro de configuração: {e}")
         sys.exit(1)
