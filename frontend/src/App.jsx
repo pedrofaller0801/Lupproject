@@ -21,15 +21,9 @@ const SECOES = [
 export default function App() {
   const [autenticado, setAutenticado] = useState(!!getToken())
   const [secaoAtiva,  setSecaoAtiva]  = useState('projeto')
-
-  if (!autenticado) {
-    return <Login onLogin={() => setAutenticado(true)} />
-  }
-
-  // Estado da análise: null | 'carregando' | { relatorio, arquivo }
-  const [analise,  setAnalise]  = useState(null)
-  const [erro,     setErro]     = useState('')
-  const [aprovando, setAprovando] = useState(false)
+  const [analise,     setAnalise]     = useState(null)
+  const [erro,        setErro]        = useState('')
+  const [aprovando,   setAprovando]   = useState(false)
 
   // Inicia a análise do PDF enviado
   async function handleAnalisar(arquivo) {
@@ -93,8 +87,12 @@ export default function App() {
     setErro('')
   }
 
-  const carregando = analise === 'carregando'
+  const carregando   = analise === 'carregando'
   const temRelatorio = analise && analise !== 'carregando'
+
+  if (!autenticado) {
+    return <Login onLogin={() => setAutenticado(true)} />
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
