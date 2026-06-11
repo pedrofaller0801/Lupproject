@@ -140,7 +140,11 @@ async def base_upload(
         relatorio: JSON do relatório de revisão (opcional).
         grupo:     Nome do grupo organizacional (opcional, ex: 'Churrasqueiras').
     """
-    ext = arquivo.filename.lower().rsplit(".", 1)[-1] if "." in arquivo.filename else ""
+    nome_base = Path(arquivo.filename).name
+    if nome_base.startswith("~$"):
+        raise HTTPException(status_code=422, detail="Arquivo temporário do Office ignorado.")
+
+    ext = nome_base.lower().rsplit(".", 1)[-1] if "." in nome_base else ""
     if ext not in ("pdf", "docx"):
         raise HTTPException(status_code=422, detail="Apenas arquivos PDF ou DOCX são aceitos.")
 

@@ -87,7 +87,7 @@ export default function BaseContexto({ onUploadChange }) {
 
   async function handleUploadPasta(e) {
     const todos = Array.from(e.target.files)
-    const arquivos = todos.filter(f => extValida(f.name))
+    const arquivos = todos.filter(f => extValida(f.name) && !f.name.startsWith('~$'))
 
     if (inputPastaRef.current) inputPastaRef.current.value = ''
 
