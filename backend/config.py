@@ -36,11 +36,11 @@ SUPABASE_KEY   = os.getenv("SUPABASE_KEY", "")
 # Parâmetros de processamento
 # ---------------------------------------------------------------------------
 
-DPI_IMAGEM            = 300    # resolução das imagens geradas das pranchas
+DPI_IMAGEM            = 150    # resolução das imagens para análise (150 suficiente para Gemini Vision)
 TAMANHO_CHUNK         = 300    # tokens por chunk
 OVERLAP_CHUNK         = 50     # overlap entre chunks consecutivos
 MIN_CHARS_PAGINA      = 100    # páginas com menos chars são consideradas gráficas
-MAX_PAGINAS_ANALISE   = 10     # limite de pranchas enviadas ao Gemini por análise
+MAX_PAGINAS_ANALISE   = 7      # limite de pranchas enviadas ao Gemini por análise
 MAX_CHUNKS_MANUAL     = 8      # chunks do manual recuperados por consulta
 MAX_CHUNKS_REFERENCIA = 5      # chunks de referência recuperados por consulta
 
