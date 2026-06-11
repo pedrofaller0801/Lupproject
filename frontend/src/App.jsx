@@ -5,7 +5,7 @@
  *   - Base de Contexto: gerenciamento dos documentos indexados
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Upload       from './components/Upload'
 import Relatorio    from './components/Relatorio'
 import BaseContexto from './components/BaseContexto'
@@ -178,9 +178,11 @@ export default function App() {
               </div>
             )}
 
-            {/* Exibe upload ou relatório, conforme o estado */}
-            {!temRelatorio ? (
-              <Upload onAnalisar={handleAnalisar} carregando={carregando} />
+            {/* Exibe upload, carregando ou relatório conforme o estado */}
+            {carregando ? (
+              <AnalisandoLoader />
+            ) : !temRelatorio ? (
+              <Upload onAnalisar={handleAnalisar} carregando={false} />
             ) : (
               <Relatorio
                 relatorio={analise.relatorio}
@@ -232,6 +234,52 @@ export default function App() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const ETAPAS = [
+  'Convertendo pranchas em imagens...',
+  'Extraindo texto do projeto...',
+  'Buscando contexto na base de manuais...',
+  'Comparando com projetos de referência...',
+  'Gerando relatório com Gemini 2.5 Flash...',
+  'Verificando consistência de áreas e medidas...',
+  'Finalizando análise...',
+]
+
+function AnalisandoLoader() {
+  const [etapa, setEtapa] = useState(0)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    ref.current = setInterval(() => {
+      setEtapa(e => (e + 1) % ETAPAS.length)
+    }, 4000)
+    return () => clearInterval(ref.current)
+  }, [])
+
+  return (
+    <div className="flex flex-col items-center justify-center py-14 gap-6">
+      {/* Anel animado */}
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 rounded-full border-4 border-indigo-100 dark:border-slate-600" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-500 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center text-indigo-400 text-xl">◈</div>
+      </div>
+
+      <div className="text-center">
+        <p className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-2">
+          Analisando projeto...
+        </p>
+        <p className="text-sm text-indigo-500 dark:text-indigo-400 h-5 transition-all duration-500">
+          {ETAPAS[etapa]}
+        </p>
+      </div>
+
+      <p className="text-xs text-gray-400 dark:text-slate-500 text-center max-w-xs">
+        A análise pode levar até 2 minutos dependendo do tamanho do projeto.
+      </p>
     </div>
   )
 }
