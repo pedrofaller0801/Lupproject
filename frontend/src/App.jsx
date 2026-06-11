@@ -5,7 +5,7 @@
  *   - Base de Contexto: gerenciamento dos documentos indexados
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Upload       from './components/Upload'
 import Relatorio    from './components/Relatorio'
 import BaseContexto from './components/BaseContexto'
@@ -24,6 +24,12 @@ export default function App() {
   const [analise,     setAnalise]     = useState(null)
   const [erro,        setErro]        = useState('')
   const [aprovando,   setAprovando]   = useState(false)
+  const [darkMode,    setDarkMode]    = useState(() => localStorage.getItem('lup_dark') === '1')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode)
+    localStorage.setItem('lup_dark', darkMode ? '1' : '0')
+  }, [darkMode])
 
   // Inicia a análise do PDF enviado
   async function handleAnalisar(arquivo, tipoProjeto = 'arquitetonico') {
@@ -98,7 +104,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Cabeçalho */}
       <header className="bg-slate-900 border-b border-slate-800 no-print">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -109,12 +115,21 @@ export default function App() {
               <p className="text-slate-500 text-xs mt-0.5">Sistema RAG · Gemini 2.5 Flash</p>
             </div>
           </div>
-          <button
-            onClick={() => { clearToken(); setAutenticado(false) }}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            Sair
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDarkMode(d => !d)}
+              className="text-slate-400 hover:text-slate-200 transition-colors text-base"
+              title="Alternar modo escuro"
+            >
+              {darkMode ? '☀' : '☾'}
+            </button>
+            <button
+              onClick={() => { clearToken(); setAutenticado(false) }}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Sair
+            </button>
+          </div>
         </div>
       </header>
 
@@ -129,13 +144,13 @@ export default function App() {
                 flex-1 py-3 px-4 rounded-xl text-left transition-all
                 ${secaoAtiva === secao.id
                   ? 'bg-indigo-600 shadow-lg shadow-indigo-200'
-                  : 'bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm'}
+                  : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-500 hover:shadow-sm'}
               `}
             >
-              <p className={`text-sm font-semibold ${secaoAtiva === secao.id ? 'text-white' : 'text-gray-700'}`}>
+              <p className={`text-sm font-semibold ${secaoAtiva === secao.id ? 'text-white' : 'text-gray-700 dark:text-slate-200'}`}>
                 {secao.label}
               </p>
-              <p className={`text-xs mt-0.5 ${secaoAtiva === secao.id ? 'text-indigo-200' : 'text-gray-400'}`}>
+              <p className={`text-xs mt-0.5 ${secaoAtiva === secao.id ? 'text-indigo-200' : 'text-gray-400 dark:text-slate-400'}`}>
                 {secao.sub}
               </p>
             </button>
@@ -144,14 +159,14 @@ export default function App() {
 
         {/* Seção: Novo Projeto */}
         {secaoAtiva === 'projeto' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-3">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-3">
               Enviar projeto para revisão
             </h2>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 flex gap-3">
-              <span className="text-amber-500 text-base leading-tight mt-0.5">⚠</span>
-              <p className="text-xs text-amber-700 leading-relaxed">
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3 mb-5 flex gap-3">
+              <span className="text-amber-500 dark:text-amber-400 text-base leading-tight mt-0.5">⚠</span>
+              <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
                 <span className="font-semibold">Revisão assistida por IA.</span> Os apontamentos gerados são sugestões automáticas — sempre revise a coerência da análise antes de aplicar qualquer alteração no projeto.
               </p>
             </div>
@@ -189,8 +204,8 @@ export default function App() {
 
         {/* Seção: Base de Contexto */}
         {secaoAtiva === 'base' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-5">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-5">
               Base de contexto
             </h2>
             <BaseContexto onUploadChange={setUploadInfo} />

@@ -29,7 +29,7 @@ export default function Apontamento({ apontamento }) {
   const estilo = SEVERIDADE_ESTILO[severidade] || SEVERIDADE_ESTILO['baixa']
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
+    <div className="border border-gray-200 dark:border-slate-600 rounded-lg p-4 bg-white dark:bg-slate-700 hover:shadow-sm transition-shadow">
       {/* Cabeçalho: severidade + origem + página */}
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${estilo.badge}`}>
@@ -38,33 +38,33 @@ export default function Apontamento({ apontamento }) {
         </span>
 
         {origem && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 dark:text-slate-400">
             {ORIGEM_LABEL[origem] || origem}
           </span>
         )}
 
         {pagina_referencia && (
-          <span className="text-xs text-gray-400 ml-auto">
+          <span className="text-xs text-gray-400 dark:text-slate-500 ml-auto">
             Prancha {pagina_referencia}
           </span>
         )}
       </div>
 
       {/* Descrição principal */}
-      <p className="text-sm text-gray-800 mb-3">{descricao}</p>
+      <p className="text-sm text-gray-800 dark:text-slate-200 mb-3">{descricao}</p>
 
       {/* Critério do manual */}
       {criterio_manual && criterio_manual !== 'null' && (
-        <div className="bg-gray-50 rounded p-2 mb-2 border-l-2 border-gray-300">
-          <p className="text-xs text-gray-500 font-medium mb-0.5">Critério do manual</p>
-          <p className="text-xs text-gray-700">{criterio_manual}</p>
+        <div className="bg-gray-50 dark:bg-slate-600 rounded p-2 mb-2 border-l-2 border-gray-300 dark:border-slate-400">
+          <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-0.5">Critério do manual</p>
+          <p className="text-xs text-gray-700 dark:text-slate-300">{criterio_manual}</p>
         </div>
       )}
 
       {/* Projeto de referência */}
       {projeto_referencia && projeto_referencia !== 'null' && (
-        <p className="text-xs text-gray-400">
-          📁 Referência: <span className="font-medium text-gray-600">{projeto_referencia}</span>
+        <p className="text-xs text-gray-400 dark:text-slate-500">
+          📁 Referência: <span className="font-medium text-gray-600 dark:text-slate-300">{projeto_referencia}</span>
         </p>
       )}
     </div>

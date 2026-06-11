@@ -194,8 +194,8 @@ export default function BaseContexto({ onUploadChange }) {
       </div>
 
       {/* Adicionar documento */}
-      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Adicionar documento</h3>
+      <div className="bg-gray-50 dark:bg-slate-700/50 rounded-xl p-4 border border-gray-200 dark:border-slate-600">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-3">Adicionar documento</h3>
 
         {/* Seleção de tipo */}
         <div className="flex gap-2 mb-3">
@@ -206,7 +206,7 @@ export default function BaseContexto({ onUploadChange }) {
               className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                 tipo === t
                   ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  : 'bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-600'
               }`}
             >
               {t === 'manual' ? '📖 Manual' : '📁 Referência'}
@@ -214,7 +214,7 @@ export default function BaseContexto({ onUploadChange }) {
           ))}
         </div>
 
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-gray-500 dark:text-slate-400 mb-3">
           {tipo === 'manual'
             ? 'PDFs ou DOCXs com critérios e normas do escritório. Aceita arquivos individuais ou pastas agrupadas por tema.'
             : 'PDFs de projetos anteriores já revisados e aprovados.'}
@@ -245,7 +245,7 @@ export default function BaseContexto({ onUploadChange }) {
             disabled={enviando}
             className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
               enviando
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-gray-200 dark:bg-slate-600 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
@@ -257,7 +257,7 @@ export default function BaseContexto({ onUploadChange }) {
             disabled={enviando}
             className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
               enviando
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-gray-200 dark:bg-slate-600 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                 : modoPasta
                   ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
@@ -307,11 +307,11 @@ export default function BaseContexto({ onUploadChange }) {
         {/* Progresso de upload de pasta */}
         {enviando && progresso.total > 0 && (
           <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="flex justify-between text-xs text-gray-500 dark:text-slate-400 mb-1">
               <span>{statusEnvio}</span>
               <span>{Math.round((progresso.atual / progresso.total) * 100)}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div className="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-1.5">
               <div
                 className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
                 style={{ width: `${(progresso.atual / progresso.total) * 100}%` }}
@@ -321,7 +321,7 @@ export default function BaseContexto({ onUploadChange }) {
         )}
 
         {enviando && progresso.total === 0 && (
-          <p className="text-xs text-gray-400 mt-2 text-center">
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-2 text-center">
             Aguarde — a indexação pode levar alguns minutos.
           </p>
         )}
@@ -336,7 +336,7 @@ export default function BaseContexto({ onUploadChange }) {
 
       {/* Lista de documentos */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-3">
           Documentos indexados ({documentos.length})
         </h3>
 
@@ -354,7 +354,7 @@ export default function BaseContexto({ onUploadChange }) {
               return (
                 <div key={nome} className="border border-indigo-200 rounded-xl overflow-hidden">
                   {/* Cabeçalho do grupo */}
-                  <div className="flex items-center justify-between bg-indigo-50 px-4 py-2.5">
+                  <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/30 px-4 py-2.5">
                     {/* Chevron + info */}
                     <button
                       onClick={() => toggleGrupo(nome)}
@@ -367,12 +367,12 @@ export default function BaseContexto({ onUploadChange }) {
                         ▼
                       </span>
                       <div>
-                        <p className="text-sm font-semibold text-indigo-800">📁 {nome}</p>
+                        <p className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">📁 {nome}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPO_LABEL[tipoGrupo]?.badge}`}>
                             {TIPO_LABEL[tipoGrupo]?.label}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-gray-400 dark:text-slate-500">
                             {docs.length} arquivo{docs.length !== 1 ? 's' : ''}
                           </span>
                         </div>
@@ -394,13 +394,13 @@ export default function BaseContexto({ onUploadChange }) {
                       {docs.map(doc => (
                         <li
                           key={doc.id}
-                          className="flex items-center justify-between bg-white px-4 py-2.5"
+                          className="flex items-center justify-between bg-white dark:bg-slate-800 px-4 py-2.5"
                         >
                           <div>
-                            <p className="text-sm text-gray-700 truncate max-w-[180px]">
+                            <p className="text-sm text-gray-700 dark:text-slate-200 truncate max-w-[180px]">
                               {doc.nome_arquivo}
                             </p>
-                            <span className="text-xs text-gray-400">{doc.total_chunks} chunks</span>
+                            <span className="text-xs text-gray-400 dark:text-slate-500">{doc.total_chunks} chunks</span>
                           </div>
                           <button
                             onClick={() => handleRemover(doc.id, doc.nome_arquivo)}
@@ -423,10 +423,10 @@ export default function BaseContexto({ onUploadChange }) {
                 {semGrupo.map(doc => (
                   <li
                     key={doc.id}
-                    className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3"
+                    className="flex items-center justify-between bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg px-4 py-3"
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-800 truncate max-w-[200px]">
+                      <p className="text-sm font-medium text-gray-800 dark:text-slate-100 truncate max-w-[200px]">
                         {doc.nome_arquivo}
                       </p>
                       <div className="flex items-center gap-2 mt-1">

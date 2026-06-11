@@ -50,11 +50,11 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
     <div>
     <div ref={conteudoRef}>
       {/* Cabeçalho do relatório */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 mb-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{projeto}</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">{projeto}</h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
               Análise gerada em {new Date(data_analise + 'T12:00:00').toLocaleDateString('pt-BR', {
                 day: '2-digit', month: 'long', year: 'numeric'
               })}
@@ -71,13 +71,13 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
 
         {/* Resumo geral */}
         {resumo && (
-          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-sm text-gray-700">{resumo}</p>
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600">
+            <p className="text-sm text-gray-700 dark:text-slate-300">{resumo}</p>
           </div>
         )}
 
         {/* Total */}
-        <p className="text-sm text-gray-500 mt-3">
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-3">
           {total_apontamentos === 0
             ? 'Nenhum apontamento identificado.'
             : `${total_apontamentos} apontamento${total_apontamentos > 1 ? 's' : ''} identificado${total_apontamentos > 1 ? 's' : ''}.`}
@@ -90,10 +90,10 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
         if (lista.length === 0) return null
 
         return (
-          <div key={key} className={`bg-white border-l-4 ${cor} border border-gray-200 rounded-xl p-5 mb-4`}>
-            <h3 className="text-base font-semibold text-gray-800 mb-4">
+          <div key={key} className={`bg-white dark:bg-slate-800 border-l-4 ${cor} border border-gray-200 dark:border-slate-700 rounded-xl p-5 mb-4`}>
+            <h3 className="text-base font-semibold text-gray-800 dark:text-slate-100 mb-4">
               {icone} {key}
-              <span className="ml-2 text-sm font-normal text-gray-500">({lista.length})</span>
+              <span className="ml-2 text-sm font-normal text-gray-500 dark:text-slate-400">({lista.length})</span>
             </h3>
             <div className="flex flex-col gap-3">
               {lista.map((ap, i) => (
@@ -119,14 +119,14 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
 
         <button
           onClick={exportarPDF}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors"
+          className="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-medium py-3 px-6 rounded-lg transition-colors"
         >
           Exportar PDF
         </button>
 
         <button
           onClick={onDescartar}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-6 rounded-lg transition-colors"
+          className="bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 font-medium py-3 px-6 rounded-lg transition-colors"
         >
           Descartar
         </button>
