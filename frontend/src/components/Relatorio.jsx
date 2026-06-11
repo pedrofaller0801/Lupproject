@@ -26,9 +26,9 @@ export default function Relatorio({ relatorio, onAprovar, onDescartar }) {
         margin:      10,
         filename:    `revisao_${projeto.replace(/\s+/g, '_')}.pdf`,
         image:       { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, height: el.scrollHeight, windowHeight: el.scrollHeight },
+        html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
         jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:   { mode: 'avoid-all' },
+        pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] },
       })
       .from(el)
       .save()
