@@ -456,8 +456,8 @@ export default function BaseContexto({ onUploadChange }) {
 
 function ResumoCard({ valor, label, cor }) {
   const cores = {
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    teal:   'bg-teal-50 text-teal-700 border-teal-200',
+    purple: 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    teal:   'bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800',
   }
   return (
     <div className={`rounded-xl p-4 border text-center ${cores[cor]}`}>
