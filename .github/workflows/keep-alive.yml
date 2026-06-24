@@ -1,0 +1,17 @@
+name: Keep Supabase Alive
+
+# Faz ping periódico no /health do backend para gerar atividade no Supabase
+# e evitar o auto-pause de projetos free-tier por inatividade (7 dias).
+on:
+  schedule:
+    - cron: "0 6 * * 1,4" # segunda e quinta às 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar /health do backend
+        run: |
+          curl --fail --silent --show-error --retry 3 --retry-delay 10 \
+            "https://lupprojects.up.railway.app/health"
