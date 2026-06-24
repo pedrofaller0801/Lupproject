@@ -1,22 +1,30 @@
 """
-Envio de feedback dos usuários por e-mail via Gmail SMTP.
+Envio de feedback dos usuários por e-mail via API HTTP do Resend.
+
+Usa a API HTTP em vez de SMTP porque plataformas como o Railway bloqueiam
+conexões SMTP de saída (portas 465/587), o que travava o envio indefinidamente.
 """
 
-import smtplib
+import asyncio
 from datetime import datetime
-from email.mime.text import MIMEText
 
-from config import FEEDBACK_EMAIL_DESTINO, GMAIL_APP_PASSWORD, GMAIL_USER
+import resend
+
+from config import FEEDBACK_EMAIL_DESTINO, RESEND_API_KEY
+
+# Domínio de testes do Resend — funciona sem verificação de domínio próprio
+# porque o destinatário é sempre o e-mail cadastrado na conta Resend.
+_REMETENTE = "Feedback Revisor de Projetos <onboarding@resend.dev>"
 
 
 def feedback_configurado() -> bool:
     """Verifica se as credenciais de envio de e-mail estão configuradas."""
-    return bool(GMAIL_USER and GMAIL_APP_PASSWORD)
+    return bool(RESEND_API_KEY and FEEDBACK_EMAIL_DESTINO)
 
 
-def enviar_feedback(mensagem: str, nome: str | None = None, contato: str | None = None) -> None:
+async def enviar_feedback(mensagem: str, nome: str | None = None, contato: str | None = None) -> None:
     """
-    Envia o feedback do usuário por e-mail usando Gmail SMTP.
+    Envia o feedback do usuário por e-mail usando a API do Resend.
 
     Args:
         mensagem: Texto do feedback enviado pelo usuário.
@@ -24,13 +32,13 @@ def enviar_feedback(mensagem: str, nome: str | None = None, contato: str | None 
         contato:  E-mail de contato de quem enviou, para resposta (opcional).
 
     Raises:
-        EnvironmentError: Se GMAIL_USER ou GMAIL_APP_PASSWORD não estiverem configurados.
-        smtplib.SMTPException: Se o envio falhar.
+        EnvironmentError: Se RESEND_API_KEY ou FEEDBACK_EMAIL_DESTINO não estiverem configurados.
+        Exception:        Se a API do Resend retornar erro.
     """
     if not feedback_configurado():
         raise EnvironmentError(
             "Envio de feedback não configurado. "
-            "Defina GMAIL_USER e GMAIL_APP_PASSWORD no arquivo .env."
+            "Defina RESEND_API_KEY e FEEDBACK_EMAIL_DESTINO no arquivo .env."
         )
 
     agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
@@ -42,14 +50,17 @@ def enviar_feedback(mensagem: str, nome: str | None = None, contato: str | None 
         f"Mensagem:\n{mensagem}"
     )
 
-    email = MIMEText(corpo, "plain", "utf-8")
-    email["Subject"] = "Novo feedback — Revisor de Projetos"
-    email["From"] = GMAIL_USER
-    email["To"] = FEEDBACK_EMAIL_DESTINO
+    resend.api_key = RESEND_API_KEY
 
+    params: dict = {
+        "from":    _REMETENTE,
+        "to":      [FEEDBACK_EMAIL_DESTINO],
+        "subject": "Novo feedback — Revisor de Projetos",
+        "text":    corpo,
+    }
     if contato:
-        email["Reply-To"] = contato
+        params["reply_to"] = contato
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-        servidor.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        servidor.send_message(email)
+    # resend.Emails.send é uma chamada HTTP bloqueante; roda em thread separada
+    # para não travar o event loop do servidor (mesmo padrão usado em ingestao.py).
+    await asyncio.to_thread(resend.Emails.send, params)

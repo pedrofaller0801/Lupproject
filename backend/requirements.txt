@@ -19,3 +19,6 @@ python-multipart>=0.0.12
 
 # Variáveis de ambiente
 python-dotenv>=1.0.0
+
+# Envio de feedback por e-mail (API HTTP, evita bloqueio de portas SMTP em PaaS)
+resend>=2.0.0

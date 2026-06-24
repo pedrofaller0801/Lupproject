@@ -279,7 +279,7 @@ async def feedback(
         )
 
     try:
-        enviar_feedback(mensagem.strip(), nome, contato)
+        await enviar_feedback(mensagem.strip(), nome, contato)
         return {"mensagem": "Feedback enviado com sucesso. Obrigado!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao enviar feedback: {str(e)}")

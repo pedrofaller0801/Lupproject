@@ -39,14 +39,18 @@ export default function Feedback() {
     if (contato.trim()) form.append('contato', contato.trim())
 
     try {
-      const res = await apiFetch('/feedback', { method: 'POST', body: form })
+      const res = await apiFetch('/feedback', {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(20_000),
+      })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.detail || 'Erro ao enviar feedback.')
       }
       setEnviado(true)
     } catch (err) {
-      setErro(err.message)
+      setErro(err.name === 'TimeoutError' ? 'O envio demorou demais. Tente novamente.' : err.message)
     } finally {
       setEnviando(false)
     }

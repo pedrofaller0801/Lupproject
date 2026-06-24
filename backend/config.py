@@ -33,9 +33,10 @@ SUPABASE_URL   = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY   = os.getenv("SUPABASE_KEY", "")
 
 # Envio de feedback por e-mail (opcional — só necessário para o botão de feedback)
-GMAIL_USER          = os.getenv("GMAIL_USER", "")
-GMAIL_APP_PASSWORD  = os.getenv("GMAIL_APP_PASSWORD", "")
-FEEDBACK_EMAIL_DESTINO = os.getenv("FEEDBACK_EMAIL_DESTINO", GMAIL_USER)
+# Usa a API HTTP do Resend em vez de SMTP, porque plataformas como o Railway
+# bloqueiam conexões SMTP de saída (portas 465/587).
+RESEND_API_KEY         = os.getenv("RESEND_API_KEY", "")
+FEEDBACK_EMAIL_DESTINO = os.getenv("FEEDBACK_EMAIL_DESTINO", "")
 
 # ---------------------------------------------------------------------------
 # Parâmetros de processamento
