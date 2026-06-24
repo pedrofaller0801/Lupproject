@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from supabase import create_client
 
 from config import SUPABASE_KEY, SUPABASE_URL, validar_config
+from feedback import enviar_feedback, feedback_configurado
 from ingestao import configurar_gemini, indexar_bytes
 from rag import analisar_projeto
 from visao import pdf_bytes_para_imagens
@@ -53,7 +54,7 @@ async def verificar_acesso(request: Request, call_next):
         return await call_next(request)
 
     caminho = request.url.path
-    if caminho.startswith(("/analisar", "/base")):
+    if caminho.startswith(("/analisar", "/base", "/feedback")):
         token    = request.headers.get("X-Access-Token", "")
         esperado = hashlib.sha256(_ACESSO_SENHA.encode()).hexdigest()
         if token != esperado:
@@ -253,6 +254,35 @@ async def health():  # noqa: E302
         "status":   "ok" if supabase_ok else "degradado",
         "supabase": supabase_ok,
     }
+
+
+# ---------------------------------------------------------------------------
+# Feedback
+# ---------------------------------------------------------------------------
+
+@app.post("/feedback")
+async def feedback(
+    mensagem: str        = Form(...),
+    nome:     str | None = Form(default=None),
+    contato:  str | None = Form(default=None),
+):
+    """
+    Recebe o feedback enviado pelo usuário pela interface e envia por e-mail.
+    """
+    if not mensagem.strip():
+        raise HTTPException(status_code=422, detail="A mensagem de feedback não pode estar vazia.")
+
+    if not feedback_configurado():
+        raise HTTPException(
+            status_code=503,
+            detail="Envio de feedback não configurado no servidor.",
+        )
+
+    try:
+        enviar_feedback(mensagem.strip(), nome, contato)
+        return {"mensagem": "Feedback enviado com sucesso. Obrigado!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar feedback: {str(e)}")
 
 
 # ---------------------------------------------------------------------------

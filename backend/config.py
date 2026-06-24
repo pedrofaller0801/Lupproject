@@ -32,6 +32,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 SUPABASE_URL   = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY   = os.getenv("SUPABASE_KEY", "")
 
+# Envio de feedback por e-mail (opcional — só necessário para o botão de feedback)
+GMAIL_USER          = os.getenv("GMAIL_USER", "")
+GMAIL_APP_PASSWORD  = os.getenv("GMAIL_APP_PASSWORD", "")
+FEEDBACK_EMAIL_DESTINO = os.getenv("FEEDBACK_EMAIL_DESTINO", GMAIL_USER)
+
 # ---------------------------------------------------------------------------
 # Parâmetros de processamento
 # ---------------------------------------------------------------------------
