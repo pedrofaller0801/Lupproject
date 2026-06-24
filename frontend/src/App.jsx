@@ -10,6 +10,7 @@ import Upload       from './components/Upload'
 import Relatorio    from './components/Relatorio'
 import BaseContexto from './components/BaseContexto'
 import Login        from './components/Login'
+import Feedback     from './components/Feedback'
 import { apiFetch, getToken, clearToken } from './api'
 
 // Seções disponíveis na navegação
@@ -234,6 +235,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <Feedback />
     </div>
   )
 }

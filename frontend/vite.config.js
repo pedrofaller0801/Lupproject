@@ -10,6 +10,7 @@ export default defineConfig({
       '/analisar':  'http://localhost:8000',
       '/base':      'http://localhost:8000',
       '/health':    'http://localhost:8000',
+      '/feedback':  'http://localhost:8000',
     },
   },
 })
