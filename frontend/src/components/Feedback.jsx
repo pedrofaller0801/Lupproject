@@ -10,6 +10,7 @@ export default function Feedback() {
   const [aberto,     setAberto]     = useState(false)
   const [mensagem,   setMensagem]   = useState('')
   const [nome,       setNome]       = useState('')
+  const [contato,    setContato]    = useState('')
   const [enviando,   setEnviando]   = useState(false)
   const [enviado,    setEnviado]    = useState(false)
   const [erro,       setErro]       = useState('')
@@ -18,6 +19,7 @@ export default function Feedback() {
     setAberto(false)
     setMensagem('')
     setNome('')
+    setContato('')
     setEnviado(false)
     setErro('')
   }
@@ -33,7 +35,8 @@ export default function Feedback() {
 
     const form = new FormData()
     form.append('mensagem', mensagem.trim())
-    if (nome.trim()) form.append('nome', nome.trim())
+    if (nome.trim())    form.append('nome', nome.trim())
+    if (contato.trim()) form.append('contato', contato.trim())
 
     try {
       const res = await apiFetch('/feedback', { method: 'POST', body: form })
@@ -94,6 +97,14 @@ export default function Feedback() {
                   placeholder="Seu nome (opcional)"
                   value={nome}
                   onChange={e => setNome(e.target.value)}
+                  className="w-full mb-3 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+
+                <input
+                  type="email"
+                  placeholder="Seu e-mail (opcional, para retorno)"
+                  value={contato}
+                  onChange={e => setContato(e.target.value)}
                   className="w-full mb-3 px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 />
 
