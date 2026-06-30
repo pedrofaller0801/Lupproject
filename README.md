@@ -1,9 +1,9 @@
-# Sistema RAG — Revisão de Projetos de Arquitetura
+# Revisor de Projetos — RAG de Revisão de Projetos de Arquitetura
 
 Sistema web que usa RAG multimodal para revisar projetos de arquitetura automaticamente.
-O arquiteto faz upload de um PDF e recebe um relatório de correções baseado no manual do escritório e em projetos anteriores já revisados.
+O arquiteto faz upload de um PDF e recebe um relatório de correções baseado no manual do escritório e em projetos anteriores já revisados, com acesso protegido por senha e canal de feedback embutido na interface.
 
-**Stack:** Python · FastAPI · Google Gemini 2.0 Flash · text-embedding-004 · Supabase pgvector · React · Tailwind CSS
+**Stack:** Python · FastAPI · Google Gemini 2.5 Flash (com fallback `gemini-2.5-flash-lite`) · `gemini-embedding-001` · Supabase pgvector · React · Tailwind CSS · Docker
 
 ---
 
@@ -34,16 +34,23 @@ Isso cria a tabela `documentos`, o índice de busca vetorial e a função `busca
 
 ## 2. Variáveis de ambiente
 
-```bash
-cp .env.example .env
-```
-
-Edite o `.env` com suas credenciais:
+Crie um arquivo `.env` na raiz do projeto:
 
 ```env
+# Obrigatórias
 GEMINI_API_KEY=sua_chave_aqui
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_KEY=sua_service_role_key_aqui
+
+# Opcional — protege as rotas de API com senha de acesso.
+# Se não definida, qualquer senha é aceita (modo dev).
+ACESSO_SENHA=
+
+# Opcional — necessário apenas para o botão de feedback funcionar.
+# Usa a API HTTP do Resend (em vez de SMTP, que costuma ser bloqueado em
+# plataformas como o Railway).
+RESEND_API_KEY=
+FEEDBACK_EMAIL_DESTINO=
 ```
 
 ---
@@ -87,6 +94,7 @@ python backend/ingestao.py --tipo referencia
 ```
 
 > **Tempo estimado:** ~45 segundos por projeto de 10 páginas (limitado pelo rate limit gratuito do Gemini).
+> Para análises sob demanda (rota `/analisar`), o tempo pode chegar a alguns minutos em PDFs grandes/complexos, já que o backend faz retry automático em caso de erro 429/503 do Gemini (timeout do frontend: 300s).
 
 ---
 
@@ -102,18 +110,38 @@ Interface disponível em `http://localhost:5173`.
 
 ---
 
+## Deploy (Docker)
+
+O `Dockerfile` na raiz compila o frontend e empacota o backend em uma única imagem, servindo a SPA estaticamente a partir do FastAPI:
+
+```bash
+docker build -t revisor-de-projetos .
+docker run -p 8000:8000 --env-file .env revisor-de-projetos
+```
+
+Em produção (ex: Railway), configure as mesmas variáveis de ambiente do passo 2 no painel da plataforma.
+
+---
+
 ## Uso do sistema
+
+### Login
+Se `ACESSO_SENHA` estiver configurada, a interface exige login antes de liberar o acesso às rotas de análise, base de contexto e feedback.
 
 ### Fluxo diário (Novo Projeto)
 1. Acesse a aba **Novo Projeto**
 2. Arraste ou selecione o PDF do projeto a revisar
-3. Clique em **Analisar projeto** e aguarde (~1-2 minutos)
-4. Leia o relatório organizado por categoria
-5. Clique em **Aprovar e salvar na base** para adicionar o projeto como referência futura
+3. Escolha o tipo de projeto (ex: arquitetônico)
+4. Clique em **Analisar projeto** e aguarde — PDFs grandes/complexos podem levar alguns minutos
+5. Leia o relatório organizado por categoria
+6. Clique em **Aprovar e salvar na base** para adicionar o projeto como referência futura
 
 ### Gerenciar a base (Base de Contexto)
-- Adicione novos manuais ou projetos de referência a qualquer momento
-- Remova documentos desatualizados da base
+- Adicione novos manuais ou projetos de referência a qualquer momento, opcionalmente agrupados (campo `grupo`)
+- Remova documentos individuais ou grupos inteiros da base
+
+### Feedback
+Um botão de feedback na interface permite enviar sugestões/problemas diretamente para o e-mail configurado em `FEEDBACK_EMAIL_DESTINO` (requer `RESEND_API_KEY`).
 
 ---
 
@@ -122,24 +150,28 @@ Interface disponível em `http://localhost:5173`.
 ```
 backend/
   config.py      ← variáveis de ambiente e constantes
-  visao.py       ← conversão de PDF em imagens (300 DPI)
+  visao.py       ← conversão de PDF em imagens (150 DPI)
   ingestao.py    ← pipeline de indexação + CLI
-  rag.py         ← busca vetorial + análise com Gemini
-  main.py        ← API FastAPI com todos os endpoints
+  rag.py         ← busca vetorial + análise com Gemini (com fallback de modelo e retry)
+  feedback.py    ← envio de feedback por e-mail via API do Resend
+  main.py        ← API FastAPI com todos os endpoints (inclui auth por senha)
 frontend/
   src/
     App.jsx
     components/
-      Upload.jsx        ← área de upload com drag & drop
+      Login.jsx         ← tela de autenticação por senha
+      Upload.jsx        ← área de upload com drag & drop + tipo de projeto
       Relatorio.jsx     ← exibição do relatório por categoria
       Apontamento.jsx   ← card individual de cada problema
       BaseContexto.jsx  ← gerenciamento da base
+      Feedback.jsx      ← formulário de envio de feedback
 documentos/
   manual/         ← coloque os PDFs do manual aqui
   projetos/       ← coloque os projetos anteriores aqui
   imagens_cache/  ← gerado automaticamente
 supabase/
   migrations/     ← SQL para criar a tabela e a função de busca
+Dockerfile        ← build único (frontend + backend) para deploy (ex: Railway)
 ```
 
 ---
@@ -148,10 +180,13 @@ supabase/
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
+| `POST` | `/auth` | Autentica com a senha de acesso e retorna um token de sessão |
 | `POST` | `/analisar` | Analisa um PDF e retorna o relatório JSON |
 | `POST` | `/base/upload` | Adiciona um documento à base |
 | `GET`  | `/base/listar` | Lista todos os documentos indexados |
 | `DELETE` | `/base/{id}` | Remove um documento da base |
+| `DELETE` | `/base/grupo/{nome_grupo}` | Remove todos os documentos de um grupo |
+| `POST` | `/feedback` | Envia uma mensagem de feedback por e-mail |
 | `GET`  | `/health` | Verifica o status do sistema |
 
 ---
