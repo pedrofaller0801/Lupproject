@@ -45,7 +45,9 @@ export default function App() {
       const res = await apiFetch('/analisar', {
         method: 'POST',
         body: form,
-        signal: AbortSignal.timeout(120_000),
+        // O backend pode retentar a chamada ao Gemini várias vezes em caso de
+        // erro 429/503, o que facilmente passa de 120s em PDFs grandes/complexos.
+        signal: AbortSignal.timeout(300_000),
       })
 
       if (!res.ok) {
@@ -57,7 +59,10 @@ export default function App() {
       setAnalise({ relatorio, arquivo })
 
     } catch (err) {
-      setErro(err.message || 'Erro ao analisar o projeto. Tente novamente.')
+      const mensagem = err.name === 'TimeoutError' || err.name === 'AbortError'
+        ? 'A análise demorou mais que o esperado e foi cancelada. PDFs grandes ou complexos podem levar alguns minutos — tente novamente.'
+        : (err.message || 'Erro ao analisar o projeto. Tente novamente.')
+      setErro(mensagem)
       setAnalise(null)
     }
   }
