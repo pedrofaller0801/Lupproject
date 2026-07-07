@@ -8,7 +8,9 @@ Execução:
 import hashlib
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +18,13 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from supabase import create_client
 
-from config import SUPABASE_KEY, SUPABASE_URL, validar_config
+from config import (
+    LIMITE_ARQUIVO_GRANDE,
+    ORCAMENTO_BACKOFF_ASYNC,
+    SUPABASE_KEY,
+    SUPABASE_URL,
+    validar_config,
+)
 from feedback import enviar_feedback, feedback_configurado
 from ingestao import configurar_gemini, indexar_bytes
 from rag import analisar_projeto
@@ -81,6 +89,42 @@ def _supabase():
 
 
 # ---------------------------------------------------------------------------
+# Análise assíncrona de arquivos grandes
+# ---------------------------------------------------------------------------
+#
+# Arquivos grandes (> LIMITE_ARQUIVO_GRANDE) são processados em segundo plano:
+# o POST /analisar devolve imediatamente um job_id e o frontend consulta o
+# resultado por polling em GET /analisar/status/{job_id}. Assim a requisição
+# HTTP não fica presa esperando a análise inteira — que em PDFs grandes pode
+# levar minutos — e não estoura o tempo limite do navegador ou do proxy.
+#
+# O estado dos jobs vive em memória (processo único do uvicorn). É reiniciado
+# se o container reiniciar; para a escala atual (equipe pequena) é aceitável.
+
+_EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=2)
+_JOBS: dict[str, dict] = {}
+
+
+def _executar_analise(job_id: str, conteudo: bytes, nome_arquivo: str, tipo_projeto: str) -> None:
+    """Executa a análise pesada numa thread e registra o resultado em _JOBS.
+
+    Roda fora do event loop (ThreadPoolExecutor) para não bloquear o servidor,
+    mantendo o endpoint de status responsivo durante o processamento.
+    """
+    try:
+        imagens = pdf_bytes_para_imagens(conteudo)
+        relatorio = analisar_projeto(
+            conteudo, nome_arquivo, imagens, tipo_projeto,
+            orcamento_backoff_s=ORCAMENTO_BACKOFF_ASYNC,
+        )
+        _JOBS[job_id] = {"status": "concluido", "relatorio": relatorio}
+    except json.JSONDecodeError:
+        _JOBS[job_id] = {"status": "erro", "detail": "O modelo retornou um JSON inválido. Tente novamente."}
+    except Exception as e:
+        _JOBS[job_id] = {"status": "erro", "detail": f"Erro na análise: {str(e)}"}
+
+
+# ---------------------------------------------------------------------------
 # Endpoints de análise
 # ---------------------------------------------------------------------------
 
@@ -92,11 +136,16 @@ async def analisar(
     """
     Recebe um PDF de projeto novo, executa a análise RAG + IA e retorna o relatório.
 
-    Passos internos:
+    Arquivos pequenos são analisados de forma síncrona (resposta imediata com o
+    relatório). Arquivos grandes (> LIMITE_ARQUIVO_GRANDE) são despachados para
+    processamento em segundo plano e a resposta traz um ``job_id`` para consulta
+    posterior via GET /analisar/status/{job_id}.
+
+    Passos internos da análise:
         1. Converte até 10 páginas em imagens JPEG
         2. Gera embedding do texto extraído
         3. Busca contexto no Supabase (manual + referências)
-        4. Monta prompt e chama gemini-2.0-flash
+        4. Monta prompt e chama gemini-2.5-flash
         5. Retorna relatório estruturado em JSON
     """
     if not arquivo.filename.lower().endswith(".pdf"):
@@ -107,6 +156,17 @@ async def analisar(
     if len(conteudo) == 0:
         raise HTTPException(status_code=422, detail="O arquivo enviado está vazio.")
 
+    # Arquivos grandes: processa em segundo plano e devolve um job_id.
+    if len(conteudo) > LIMITE_ARQUIVO_GRANDE:
+        job_id = uuid4().hex
+        _JOBS[job_id] = {"status": "processando"}
+        _EXECUTOR.submit(_executar_analise, job_id, conteudo, arquivo.filename, tipo_projeto)
+        return JSONResponse(
+            {"job_id": job_id, "status": "processando"},
+            status_code=202,
+        )
+
+    # Arquivos pequenos: fluxo síncrono tradicional.
     try:
         imagens = pdf_bytes_para_imagens(conteudo)
         relatorio = analisar_projeto(conteudo, arquivo.filename, imagens, tipo_projeto)
@@ -119,6 +179,30 @@ async def analisar(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+
+
+@app.get("/analisar/status/{job_id}")
+async def analisar_status(job_id: str):
+    """
+    Consulta o resultado de uma análise assíncrona (arquivos grandes).
+
+    Retorna ``{"status": "processando"}`` enquanto a análise roda, ou o
+    relatório completo / o erro quando termina. Estados terminais são removidos
+    da memória ao serem lidos.
+    """
+    job = _JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Análise não encontrada ou já expirada.")
+
+    if job["status"] == "concluido":
+        _JOBS.pop(job_id, None)
+        return {"status": "concluido", "relatorio": job["relatorio"]}
+
+    if job["status"] == "erro":
+        _JOBS.pop(job_id, None)
+        return {"status": "erro", "detail": job["detail"]}
+
+    return {"status": "processando"}
 
 
 # ---------------------------------------------------------------------------

@@ -51,11 +51,19 @@ export default function App() {
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         throw new Error(data.detail || 'Erro desconhecido na análise.')
       }
 
-      const relatorio = await res.json()
+      const data = await res.json()
+
+      // Arquivos grandes são processados em segundo plano: o backend devolve um
+      // job_id e consultamos o resultado por polling, evitando que a requisição
+      // fique presa e estoure o tempo limite. Arquivos pequenos já vêm prontos.
+      const relatorio = data.job_id
+        ? await aguardarAnalise(data.job_id)
+        : data
+
       setAnalise({ relatorio, arquivo })
 
     } catch (err) {
@@ -65,6 +73,30 @@ export default function App() {
       setErro(mensagem)
       setAnalise(null)
     }
+  }
+
+  // Consulta o status de uma análise assíncrona (arquivos grandes) até que ela
+  // conclua, falhe ou exceda o tempo máximo de espera.
+  async function aguardarAnalise(jobId, { intervaloMs = 4000, tentativasMax = 150 } = {}) {
+    for (let i = 0; i < tentativasMax; i++) {
+      await new Promise(resolve => setTimeout(resolve, intervaloMs))
+
+      const res = await apiFetch(`/analisar/status/${jobId}`, {
+        signal: AbortSignal.timeout(30_000),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.detail || 'Falha ao consultar o status da análise.')
+      }
+
+      const data = await res.json()
+      if (data.status === 'concluido') return data.relatorio
+      if (data.status === 'erro')      throw new Error(data.detail || 'Erro na análise.')
+      // status 'processando' → continua aguardando
+    }
+
+    throw new Error('A análise excedeu o tempo máximo de espera. Tente novamente.')
   }
 
   // Aprova o relatório e envia o projeto para a base de referências

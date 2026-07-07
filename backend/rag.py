@@ -14,6 +14,7 @@ from supabase import create_client
 from config import (
     MAX_CHUNKS_MANUAL,
     MAX_CHUNKS_REFERENCIA,
+    ORCAMENTO_BACKOFF_SYNC,
     SUPABASE_KEY,
     SUPABASE_URL,
 )
@@ -27,14 +28,22 @@ def _gerar_conteudo_com_retry(
     model:    str,
     contents: list,
     max_tentativas: int = 3,
+    orcamento_backoff_s: float = ORCAMENTO_BACKOFF_SYNC,
 ):
     """
     Chama generate_content com retry automático para erros transitórios.
     Em 429 aguarda o retryDelay indicado pela API.
     Em 503 aguarda 10s entre tentativas.
     Após esgotar tentativas no modelo principal, tenta o fallback.
+
+    O tempo total dormido em backoff é limitado por ``orcamento_backoff_s``:
+    quando a próxima espera ultrapassaria esse orçamento, a função para de
+    aguardar (tenta o próximo modelo imediatamente ou propaga o erro). Isso
+    evita que sucessivos 429/503 façam a análise dormir por vários minutos e
+    estourar o tempo limite do cliente.
     """
     modelos = [model] + [m for m in _MODELOS_FALLBACK if m != model]
+    gasto_backoff = 0.0
 
     for modelo_atual in modelos:
         for tentativa in range(max_tentativas):
@@ -58,6 +67,15 @@ def _gerar_conteudo_com_retry(
                 else:
                     espera = 10 * (tentativa + 1)
 
+                # Respeita o orçamento total de backoff: se não há tempo para
+                # esperar, não adianta dormir — tenta o próximo modelo ou desiste.
+                if gasto_backoff + espera > orcamento_backoff_s:
+                    print(f"  [{msg[:3]}] {modelo_atual} indisponível — orçamento de backoff esgotado ({gasto_backoff:.0f}s/{orcamento_backoff_s:.0f}s).")
+                    if modelo_atual == modelos[-1]:
+                        raise
+                    break  # tenta próximo modelo imediatamente
+
+                gasto_backoff += espera
                 print(f"  [{msg[:3]}] {modelo_atual} indisponível — aguardando {espera}s (tentativa {tentativa + 1}/{max_tentativas})...")
                 time.sleep(espera)
 
@@ -220,6 +238,7 @@ def analisar_projeto(
     nome_arquivo: str,
     imagens:      list[bytes],
     tipo_projeto: str = "arquitetonico",
+    orcamento_backoff_s: float = ORCAMENTO_BACKOFF_SYNC,
 ) -> dict:
     """
     Pipeline completo de análise RAG + Gemini Vision.
@@ -274,6 +293,7 @@ def analisar_projeto(
     resposta = _gerar_conteudo_com_retry(
         model="gemini-2.5-flash",
         contents=conteudo,
+        orcamento_backoff_s=orcamento_backoff_s,
     )
     texto_resposta = resposta.text.strip()
 

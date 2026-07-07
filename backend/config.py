@@ -50,6 +50,23 @@ MAX_PAGINAS_ANALISE   = 7      # limite de pranchas enviadas ao Gemini por anál
 MAX_CHUNKS_MANUAL     = 8      # chunks do manual recuperados por consulta
 MAX_CHUNKS_REFERENCIA = 5      # chunks de referência recuperados por consulta
 
+# ---------------------------------------------------------------------------
+# Análise assíncrona para arquivos grandes
+# ---------------------------------------------------------------------------
+
+# PDFs acima deste tamanho são processados em segundo plano (job + polling),
+# evitando que a requisição HTTP fique presa esperando a análise inteira e
+# estoure o tempo limite do navegador ou do proxy da plataforma. Arquivos
+# menores continuam no fluxo síncrono tradicional (resposta imediata).
+LIMITE_ARQUIVO_GRANDE = 8 * 1024 * 1024   # 8 MB
+
+# Orçamento máximo de espera (backoff) acumulada nas retentativas ao Gemini.
+# Impede que sucessivos erros 429/503 façam a análise dormir indefinidamente
+# e estourar o tempo limite. O fluxo assíncrono tolera esperas maiores porque
+# nenhuma requisição HTTP fica bloqueada aguardando o resultado.
+ORCAMENTO_BACKOFF_SYNC  = 90    # segundos — arquivos pequenos (fluxo síncrono)
+ORCAMENTO_BACKOFF_ASYNC = 240   # segundos — arquivos grandes (fluxo assíncrono)
+
 
 # ---------------------------------------------------------------------------
 # Validação
